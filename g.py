@@ -1,5 +1,5 @@
-#from flask import Flask, request, jsonify
-# from spacy.en import English
+from flask import Flask, request, jsonify
+from spacy.en import English
 
 import argparse , sys
 import json
@@ -38,7 +38,7 @@ def spacy_to_pubannotation(doc):
 	return(json.dumps(my_json,sort_keys=True))
 
 def stanford(input_text,model=DEFAULT_MODEL):
-	"""Uses model to tokenize and tag input text"""
+	"""Uses model to tokenize and tag input text. Assumes Stanford POS tagger is in 'stanford' subdirectory, and that Tagger.java is already compiled."""
 
 	subprocess.call(['pwd'])
 	output = subprocess.check_output([	'java', 
@@ -84,7 +84,7 @@ def lists_to_spacy(tokens,tags,nlp):
 	except (AssertionError, IndexError) as e:
 		print("Error while creating spacy object for the sentence '{}'.".format(" ".join(tokens)))
 		return None
-	
+
 
 def test(textus,nlp):
 	lista = stanford(textus)
@@ -96,6 +96,28 @@ def test(textus,nlp):
 	json = spacy_to_pubannotation(doc)
 	print(json)
 
+app = Flask(__name__)
+
+@app.route('/')
+
+@app.route('/spacy_rest', methods = ['GET','POST'])
+def spacy_rest():
+	
+	if 'text' in request.args:
+		return("Tranformed {}\n".format(request.args['text']))
+	
+@app.route('/spacy_rest/' , methods = ['GET','POST'])
+def spacy_rest_d():
+	
+	if request.headers['Content-Type'] == 'application/json':
+		return("Transformed {}\n".format(request.get_json()['text']))
+	elif request.headers['Content-Type'] == 'application/x-www-form-urlencoded':
+		
+		return("Transformed {}\n".format(request.form['text']))
+	else:
+		return("415 Unsupported media type\n")
+	
+
 if __name__ == '__main__':
 	# parser = argparse.ArgumentParser()
 	# parser.add_argument('-m', '--model' , action="store" ,
@@ -106,6 +128,7 @@ if __name__ == '__main__':
 	# pb = pubannotation(arguments.input_text)
 	# print(pb)
 	
-	# app.run(debug=True)
 	
-	i=0
+	
+	app.run(debug=True)
+	
