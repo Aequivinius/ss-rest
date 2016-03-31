@@ -4,10 +4,14 @@ from spacy.en import English
 import argparse , sys
 import json
 import subprocess
+import pexpect
 
 # Global variables to match the model and mode used by stanford tagger
 DEFAULT_MODEL = 'models/wsj-0-18-left3words-nodistsim.tagger'
 DEFAULT_SEPARATOR = '/'
+
+app = Flask(__name__)
+nlp = English()
 
 # 1: use Flask to give text to parse
 # 2.1: use stanford to tag
@@ -86,7 +90,7 @@ def lists_to_spacy(tokens,tags,nlp):
 		return None
 
 
-def test(textus,nlp):
+def text_to_json(textus):
 	lista = stanford(textus)
 	print(lista)
 	tokens, tags = stanford_to_lists(lista,'/')
@@ -94,41 +98,35 @@ def test(textus,nlp):
 	doc = lists_to_spacy(tokens,tags,nlp)
 	print(doc)
 	json = spacy_to_pubannotation(doc)
-	print(json)
-
-app = Flask(__name__)
-
-@app.route('/')
+	return(json)
 
 @app.route('/spacy_rest', methods = ['GET','POST'])
 def spacy_rest():
 	
 	if 'text' in request.args:
-		return("Tranformed {}\n".format(request.args['text']))
+		return(text_to_json(request.args['text']))
 	
 @app.route('/spacy_rest/' , methods = ['GET','POST'])
 def spacy_rest_d():
 	
 	if request.headers['Content-Type'] == 'application/json':
-		return("Transformed {}\n".format(request.get_json()['text']))
+		return(text_to_json(request.get_json()['text']))
 	elif request.headers['Content-Type'] == 'application/x-www-form-urlencoded':
 		
-		return("Transformed {}\n".format(request.form['text']))
+		return(text_to_json(request.form['text']))
 	else:
-		return("415 Unsupported media type\n")
-	
+		return("415 Unsupported media type\n")	
+
+def expection():
+	child = pexpect.spawnu('java -mx300m -classpath stanford-postagger.jar:lib/* edu.stanford.nlp.tagger.maxent.MaxentTagger -model models/wsj-0-18-bidirectional-distsim.tagger',cwd='stanford')
+	child.expect('.*\)')
 
 if __name__ == '__main__':
 	# parser = argparse.ArgumentParser()
 	# parser.add_argument('-m', '--model' , action="store" ,
 	# 					dest="model" , default=DEFAULT_MODEL)
-	# parser.add_argument('input_text', action="store")
 	# arguments = parser.parse_args(sys.argv[1:])
-	
-	# pb = pubannotation(arguments.input_text)
-	# print(pb)
-	
-	
 	
 	app.run(debug=True)
 	
+	# expection()
