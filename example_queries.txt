@@ -1,9 +1,5 @@
 curl -d text="Induction of chromosome banding by trypsin/EDTA for gene mapping by in situ hybridization. We describe an easy and reproducible procedure that utilizes trypsin/EDTA for the induction of chromosome banding in conjunction with in situ hybridization. The high quality banding resolution required for grain localization is obtained on both elongated and contracted chromosomes derived from synchronized or nonsynchronized human lymphocytes or fibroblasts. This procedure can also be useful for gene localization on chromosomes from cancer cells." 127.0.0.1:5000/spacy_rest/
 
-
-curl -H "content-type:application/json" -d '{"text":"This is a test"}' 127.0.0.1:5000/spacy_rest/
-
-curl -H "content-type:application/bla" -d '{"text":"This is a test"}' 127.0.0.1:5000/spacy_rest/
-
+curl -H "content-type:application/json" -d '{"text":"Induction of chromosome banding by trypsin/EDTA for gene mapping by in situ hybridization."}' 127.0.0.1:5000/spacy_rest/
 
 curl 127.0.0.1:5000/spacy_rest?text=This+is+a+test
