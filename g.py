@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify , make_response , render_template
 from spacy.en import English
 import pexpect
 
@@ -19,17 +19,26 @@ app = Flask(__name__)
 # 2.2: use spacy to parse
 # 3: return PB Json (which can be visualized in TextAE)
 
+test_string = """{"denotations": [{"id": "T0", "obj": "NNP", "span": {"begin": 0, "end": 9}}, {"id": "T1", "obj": "IN", "span": {"begin": 10, "end": 12}}, {"id": "T2", "obj": "NN", "span": {"begin": 13, "end": 23}}, {"id": "T3", "obj": "NN", "span": {"begin": 24, "end": 31}}, {"id": "T4", "obj": "IN", "span": {"begin": 32, "end": 34}}, {"id": "T5", "obj": "NNP", "span": {"begin": 35, "end": 47}}, {"id": "T6", "obj": "IN", "span": {"begin": 48, "end": 51}}, {"id": "T7", "obj": "NN", "span": {"begin": 52, "end": 56}}, {"id": "T8", "obj": "NN", "span": {"begin": 57, "end": 64}}, {"id": "T9", "obj": "IN", "span": {"begin": 65, "end": 67}}, {"id": "T10", "obj": "IN", "span": {"begin": 68, "end": 70}}, {"id": "T11", "obj": "NN", "span": {"begin": 71, "end": 75}}, {"id": "T12", "obj": "NN", "span": {"begin": 76, "end": 89}}, {"id": "T13", "obj": ".", "span": {"begin": 90, "end": 91}}], "relations": [{"id": "R0", "obj": "T0", "pred": "ROOT", "subj": "T0"}, {"id": "R1", "obj": "T0", "pred": "prep", "subj": "T1"}, {"id": "R2", "obj": "T3", "pred": "compound", "subj": "T2"}, {"id": "R3", "obj": "T1", "pred": "pobj", "subj": "T3"}, {"id": "R4", "obj": "T3", "pred": "prep", "subj": "T4"}, {"id": "R5", "obj": "T4", "pred": "pobj", "subj": "T5"}, {"id": "R6", "obj": "T3", "pred": "prep", "subj": "T6"}, {"id": "R7", "obj": "T8", "pred": "compound", "subj": "T7"}, {"id": "R8", "obj": "T6", "pred": "pobj", "subj": "T8"}, {"id": "R9", "obj": "T0", "pred": "prep", "subj": "T9"}, {"id": "R10", "obj": "T0", "pred": "prep", "subj": "T10"}, {"id": "R11", "obj": "T12", "pred": "amod", "subj": "T11"}, {"id": "R12", "obj": "T10", "pred": "pobj", "subj": "T12"}, {"id": "R13", "obj": "T0", "pred": "punct", "subj": "T13"}], "text": "Induction of chromosome banding by trypsin/EDTA for gene mapping by in situ hybridization ."}"""
+
 ##############
 # FLASK THINGS
 ##############
-@app.route('/spacy_rest', methods = ['GET','POST'])
+@app.route('/spacy_rest', methods = ['GET', 'POST'])
 def rest():
 	"""Used to make requests as:
 	   curl 127.0.0.1:5000/spacy_rest?text=This+is+a+test
 	"""
-
-	if 'text' in request.args:
-		return(text_to_json(request.args['text']))
+	
+	if request.method == 'GET':
+		if 'text' in request.args:
+			json_ = text_to_json(request.args['text'])
+			return(render_template('readme.html',labat=json_,labut=request.args['text']))
+		return(render_template('readme.html',labut="It is a REST service to produce annotation of syntactic parsing."))
+		
+	if request.method == 'POST':
+		if 'text' in request.form:
+			return(text_to_response(request.args['text']))
 
 @app.route('/spacy_rest/' , methods = ['GET','POST'])
 def rest_d():
@@ -38,16 +47,21 @@ def rest_d():
 	if request.headers['Content-Type'] == 'application/json':
 		
 		if 'text' in request.get_json():
-			return(text_to_json(request.get_json()['text']))
+			return(text_to_response(request.get_json()['text']))
 		else:
 			return("400 Bad Request (no 'text' data)")
 	elif request.headers['Content-Type'] == 'application/x-www-form-urlencoded':
 		if 'text' in request.form:
-			return(text_to_json(request.form['text']))
+			return(text_to_response(request.form['text']))
 		else:
 			return("400 Bad Request (no 'text' data)")
 	else:
 		return("415 Unsupported media type\n")	
+
+def text_to_response(text):
+	json = text_to_json(text)
+	response = json_to_response(json)
+	return response
 		
 def text_to_json(text):
 	"""Coordinates the entire pipeline"""
@@ -61,10 +75,18 @@ def text_to_json(text):
 		print(tokens,tags)
 		doc = lists_to_spacy(tokens,tags,my_nlp)
 		print(doc)
-		json = spacy_to_pubannotation(doc)
-		return(json)
+		json_ = spacy_to_pubannotation(doc)
+		return(json_)
 	except():
 		return('400 Bad Request (possibly an error occured when parsing due to unexpected format')
+
+def json_to_response(json_):
+	response = make_response(json_)
+	
+	# This is necessary to allow the REST be accessed from other domains
+	response.headers['Access-Control-Allow-Origin'] = '*'
+	return(response)
+	
 
 #################
 # ACTUAL PIPELINE
