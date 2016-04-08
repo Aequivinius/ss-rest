@@ -1,16 +1,25 @@
+/* Color Scheme
+ * dark blue: 9BB2D7
+ * light blue: B9D0F3
+ * green: 99A853
+ * light brown: A4917A
+ * dark brown: 5A4E40 */
+
 body, .pre-blur-box {
 	background-image: url('background.jpg');
 	background-repeat: no-repeat;
 	background-size: cover;
 	background-position: center center;
 	background-attachment: fixed;
-	background-color: #ccccff;
+	background-color: #B9D0F3;
 }
 
 body {
+	border-top: solid 4px #5A4E40;
+	margin: 0px 0px 0px 0px;
 	background-position: center center;
 	background-attachment: fixed;
-	background-color: #ccccff;
+	background-color: #B9D0F3;
 	z-index: 1
 }
 

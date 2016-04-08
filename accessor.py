@@ -15,162 +15,6 @@ DEFAULT_STANFORD_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__fil
 
 TEXT_ERROR = "No 'text' to process. Use spacy_rest?text=This+is+an+example."
 DEFAULT_TEST_INPUT = "It is a REST service to produce annotation of syntactic parsing."
-TEST_JSON = """{
-  "text": "It is a REST service to produce annotation of syntactic parsing.",
-  "denotations": [
-	{
-	  "id": "T0",
-	  "span": {
-		"begin": 0,
-		"end": 2
-	  },
-	  "obj": "PRP"
-	},
-	{
-	  "id": "T1",
-	  "span": {
-		"begin": 3,
-		"end": 5
-	  },
-	  "obj": "VB"
-	},
-	{
-	  "id": "T2",
-	  "span": {
-		"begin": 6,
-		"end": 7
-	  },
-	  "obj": "DT"
-	},
-	{
-	  "id": "T3",
-	  "span": {
-		"begin": 8,
-		"end": 12
-	  },
-	  "obj": "NN"
-	},
-	{
-	  "id": "T4",
-	  "span": {
-		"begin": 13,
-		"end": 20
-	  },
-	  "obj": "NN"
-	},
-	{
-	  "id": "T5",
-	  "span": {
-		"begin": 21,
-		"end": 23
-	  },
-	  "obj": "TO"
-	},
-	{
-	  "id": "T6",
-	  "span": {
-		"begin": 24,
-		"end": 31
-	  },
-	  "obj": "VB"
-	},
-	{
-	  "id": "T7",
-	  "span": {
-		"begin": 32,
-		"end": 42
-	  },
-	  "obj": "NN"
-	},
-	{
-	  "id": "T8",
-	  "span": {
-		"begin": 43,
-		"end": 45
-	  },
-	  "obj": "IN"
-	},
-	{
-	  "id": "T9",
-	  "span": {
-		"begin": 46,
-		"end": 55
-	  },
-	  "obj": "JJ"
-	},
-	{
-	  "id": "T10",
-	  "span": {
-		"begin": 56,
-		"end": 63
-	  },
-	  "obj": "NN"
-	}
-  ],
-  "relations": [
-	{
-	  "id": "R0",
-	  "subj": "T6",
-	  "obj": "T0",
-	  "pred": "arg1Of"
-	},
-	{
-	  "id": "R1",
-	  "subj": "T6",
-	  "obj": "T1",
-	  "pred": "arg1Of"
-	},
-	{
-	  "id": "R2",
-	  "subj": "T4",
-	  "obj": "T1",
-	  "pred": "arg2Of"
-	},
-	{
-	  "id": "R3",
-	  "subj": "T4",
-	  "obj": "T2",
-	  "pred": "arg1Of"
-	},
-	{
-	  "id": "R4",
-	  "subj": "T4",
-	  "obj": "T3",
-	  "pred": "arg1Of"
-	},
-	{
-	  "id": "R5",
-	  "subj": "T6",
-	  "obj": "T5",
-	  "pred": "arg1Of"
-	},
-	{
-	  "id": "R6",
-	  "subj": "T7",
-	  "obj": "T6",
-	  "pred": "arg2Of"
-	},
-	{
-	  "id": "R7",
-	  "subj": "T7",
-	  "obj": "T8",
-	  "pred": "arg1Of"
-	},
-	{
-	  "id": "R8",
-	  "subj": "T10",
-	  "obj": "T8",
-	  "pred": "arg2Of"
-	},
-	{
-	  "id": "R9",
-	  "subj": "T10",
-	  "obj": "T9",
-	  "pred": "arg1Of"
-	}
-  ]
-}
-"""
 
 app = Flask(__name__)
 
@@ -217,10 +61,12 @@ def rest():
 			verbose("Received GET request for '{}'. Will return HTML...".format(request.args['text']))
 			try:
 				json_ = text_to_json(request.args['text'])
-				pretty_json = json.dumps(json.loads(json_),sort_keys=True,indent=4)
+				verbose(json_,type(json_))
+				pretty_json = json.dumps(str(json.loads(json_)),sort_keys=True,indent=4)
+				verbose(pretty_json,type(pretty_json))
 				return(render_template('index.html',json=json_,pretty_json=pretty_json,input_text=request.args['text']))
-			except Exception:
-				return(error_page("Error processing GET request for '{}'".format(request.args['text'])),500)
+			except Exception as e:
+				return(error_page("Error processing GET request for '{}'\n{}".format(request.args['text'],e)),500)
 		
 		# some other fantasy argument supplied
 		if len(request.args) > 0:
@@ -269,12 +115,13 @@ def text_to_json(text):
 	
 	try: 
 		tokens = ask_stanford(STANFORD,text)
-		print(tokens)
+		verbose(tokens)
 		tokens, tags = stanford_to_lists(tokens)
-		print(tokens,tags)
+		verbose(tokens,tags)
 		doc = lists_to_spacy(tokens,tags,SPACY)
-		print(doc)
+		verbose(doc)
 		json_ = spacy_to_pubannotation(doc)
+		verbose(json_)
 		return(json_)
 	except Exception:
 		return('400 Bad Request (possibly an error occured when parsing due to unexpected format',400)
@@ -284,6 +131,11 @@ def json_to_response(json_):
 	
 	# This is necessary to allow the REST be accessed from other domains
 	response.headers['Access-Control-Allow-Origin'] = '*'
+
+	response.headers['Content-Type'] = 'application/json'
+	response.headers['Content-Length'] = len(json_)
+	response.headers['X-Content-Type-Options'] = 'nosniff'
+	response.headers['charset'] = 'utf-8'
 	return(response)
 	
 
@@ -388,9 +240,10 @@ def spacy_to_pubannotation(doc):
 #########################
 # SCRIPT HELPER FUNCTIONS
 #########################
-def verbose(text):
+def verbose(*args):
 	if arguments.verbose:
-		print(text)
+		for arg in args:
+			print(arg)
 		return time.time()
 	return 0
 
