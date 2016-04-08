@@ -195,6 +195,13 @@ def stanford_to_lists(tokens,separator=DEFAULT_SEPARATOR):
 
 		elif "".join(token.split(separator)[:-1]) == '-RRB-':
 			token_list.append(")")
+			
+		# as well as -LSB- and -RSB-
+		elif "".join(token.split(separator)[:-1]) == '-LSB-':
+			token_list.append("[") 
+		
+		elif "".join(token.split(separator)[:-1]) == '-RSB-':
+			token_list.append("]")
 
 		else:
 			token_list.append(separator.join(token.split(separator)[:-1]))
