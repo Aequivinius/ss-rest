@@ -72,7 +72,7 @@ def rest():
 				verbose(pretty_json,type(pretty_json))
 				return(render_template('index.html',json=json_,pretty_json=pretty_json,input_text=request.args['text']))
 			except Exception as e:
-				return(error_page("Error processing GET request for '{}'\n{}".format(request.args['text'],e)),500)
+				return(error_page("Error processing GET request for '{}'".format(request.args['text'],),e),500)
 		
 		# some other fantasy argument supplied
 		if len(request.args) > 0:
@@ -103,8 +103,8 @@ def rest_d():
 	else:
 		return("Unsupported media type.",415)
 		
-def error_page(error):
-	return(render_template('index.html',error=error,input_text=DEFAULT_TEST_INPUT))
+def error_page(error,errorcode=False):
+	return(render_template('index.html',error=error,input_text=DEFAULT_TEST_INPUT,errorcode=errorcode))
 	
 @app.errorhandler(404)
 def not_found(error):
@@ -171,15 +171,17 @@ def ask_stanford_pexpect(stanford,text):
 	tokens = result.splitlines()[1:-1]
 	return(tokens)
 	
-def stanford_socket(host=STANFORD_HOST,port=STANFORD_PORT):
-	# ToDo : Launch server here
+# ToDo : Launch server here
 	
+def stanford_socket(host=STANFORD_HOST,port=STANFORD_PORT):
 	s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 	s.connect((host,port))
 	return s
 	
 def ask_stanford(stanford_socket,text,expected=1024):
 	"""Will send message to socket where Stanford Server is listening and read reply"""
+	
+	s = stanford_socket()
 	
 	if not isinstance(text, bytes):
 		try:
@@ -189,17 +191,19 @@ def ask_stanford(stanford_socket,text,expected=1024):
 			return
 			
 			
-	stanford_socket.sendall(text)
-	stanford_socket.shutdown(socket.SHUT_WR)
+	s.sendall(text)
+	s.shutdown(socket.SHUT_WR)
 	
 	# TODO: Timeout
 	
 	reply = ""
 	while True:
-		data = stanford_socket.recv(expected)
+		data = s.recv(expected)
 		if data == b'':
 			break
 		reply += data.decode()
+	
+	s.close()
 	
 	# TODO: replayce this split with a more elaborate method
 	return reply.strip().split()
@@ -317,9 +321,10 @@ if __name__ == '__main__':
 		
 	# in python, if-statements do not introduce a new scope
 	# so these variables are globally available
-	start = verbose("Launching Stanford Server...")
-	STANFORD = stanford_socket()
-	verbose("Stanford Server launched after {:.3f} seconds.\n".format(time.time()-start))
+	# TODO: launch server
+	# start = verbose("Launching Stanford Server...")
+	# STANFORD = stanford_socket()
+	# verbose("Stanford Server launched after {:.3f} seconds.\n".format(time.time()-start))
 	
 	start = verbose("Loading spaCy (this can easily take some 20 seconds)...")
 	SPACY = English()
