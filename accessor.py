@@ -1,17 +1,23 @@
 from flask import Flask, request , make_response , render_template
 from spacy.en import English
-import pexpect
+import socket
 
+# only for backup
+import pexpect
 import subprocess
+
 import argparse , sys
 import json
 import os.path
 import time
 
+# Todo: Remove DEFAULT from these since python is case sensitive
 # Default values to match the model and mode used by stanford tagger
 DEFAULT_MODEL = 'models/wsj-0-18-left3words-nodistsim.tagger'
-DEFAULT_SEPARATOR = '/'
+DEFAULT_SEPARATOR = '_'
 DEFAULT_STANFORD_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)),'stanford')
+STANFORD_HOST = 'localhost'
+STANFORD_PORT = 2020
 
 TEXT_ERROR = "No 'text' to process. Use spacy_rest?text=This+is+an+example."
 DEFAULT_TEST_INPUT = "It is a REST service to produce annotation of syntactic parsing."
@@ -152,7 +158,7 @@ def stanford_pexpect(model=DEFAULT_MODEL,separator=DEFAULT_SEPARATOR,stanford=DE
 	child.expect("STFINPT:",timeout=5)
 	return(child)
 	
-def ask_stanford(stanford,text):
+def ask_stanford_pexpect(stanford,text):
 	"""Tags text using a previously created Stanford JVM using stanford_pexpect()"""
 	
 	stanford.sendline(text)
@@ -164,6 +170,39 @@ def ask_stanford(stanford,text):
 
 	tokens = result.splitlines()[1:-1]
 	return(tokens)
+	
+def stanford_socket(host=STANFORD_HOST,port=STANFORD_PORT):
+	# ToDo : Launch server here
+	
+	s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+	s.connect((host,port))
+	return s
+	
+def ask_stanford(stanford_socket,text,expected=1024):
+	"""Will send message to socket where Stanford Server is listening and read reply"""
+	
+	if not isinstance(text, bytes):
+		try:
+			text = text.encode()
+		except Exception as e:
+			print(e)
+			return
+			
+			
+	stanford_socket.sendall(text)
+	stanford_socket.shutdown(socket.SHUT_WR)
+	
+	# TODO: Timeout
+	
+	reply = ""
+	while True:
+		data = stanford_socket.recv(expected)
+		if data == b'':
+			break
+		reply += data.decode()
+	
+	# TODO: replayce this split with a more elaborate method
+	return reply.strip().split()
 
 def stanford(input_text,model=DEFAULT_MODEL,stanford=DEFAULT_STANFORD_DIRECTORY):
 	"""Uses model to tokenize and tag input text. Assumes that Tagger.java is already compiled. This method creates and closes a new JVM for every call."""
@@ -276,11 +315,11 @@ if __name__ == '__main__':
 	
 	start = verbose("Stanford + spaCy accessor.\n")
 		
-	# in python, if statements do not introduce a new scope
+	# in python, if-statements do not introduce a new scope
 	# so these variables are globally available
-	start = verbose("Launching Stanford JVM...")
-	STANFORD = stanford_pexpect()
-	verbose("Stanford JVM launched after {:.3f} seconds.\n".format(time.time()-start))
+	start = verbose("Launching Stanford Server...")
+	STANFORD = stanford_socket()
+	verbose("Stanford Server launched after {:.3f} seconds.\n".format(time.time()-start))
 	
 	start = verbose("Loading spaCy (this can easily take some 20 seconds)...")
 	SPACY = English()
