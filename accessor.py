@@ -2,26 +2,26 @@ from flask import Flask, request , make_response , render_template
 from spacy.en import English
 import socket
 
-# only for backup
-import pexpect
-import subprocess
-
 import argparse , sys
 import json
-import os.path
 import time
 
-# Todo: Remove DEFAULT from these since python is case sensitive
-# Default values to match the model and mode used by stanford tagger
-DEFAULT_MODEL = 'models/wsj-0-18-left3words-nodistsim.tagger'
-DEFAULT_SEPARATOR = '_'
-DEFAULT_STANFORD_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)),'stanford')
+################
+# DEFAULT VALUES
+################
+STANFORD_MODEL = 'models/wsj-0-18-left3words-nodistsim.tagger'
+STANFORD_SEPARATOR = '_'
 STANFORD_HOST = 'localhost'
 STANFORD_PORT = 2020
+STANFORD_TIMEOUT = 5 # in seconds
 
-TEXT_ERROR = "No 'text' to process. Use spacy_rest?text=This+is+an+example."
-DEFAULT_TEST_INPUT = "It is a REST service to produce annotation of syntactic parsing."
+TEST_SENTENCE = """Much I marveled this ungainly fowl to hear discourse so plainly,
+Though its answer little meaning— little relevancy bore"""
+NO_TEXT_ERROR = """No 'text' to process supplied. Use spacy_rest?text=This+is+an+example."""
+NO_TEXT_ERROR_D = """No 'text' to process supplied. Use the following: curl -d text="This is an example""""
 
+# Needs to be launched here, so Flask can deal
+# With the decorators
 app = Flask(__name__)
 
 ###################
@@ -37,105 +37,78 @@ app = Flask(__name__)
 ##############
 @app.route('/spacy_rest', methods = ['GET', 'POST'])
 def rest():
-	"""Used to make requests as:
+	"""Used to make requests such as:
 	   curl 127.0.0.1:5000/spacy_rest?text=This+is+a+test
-	and to serve the HTML"""
+	   and to serve the HTML"""
 	
-	# serve plain JSON. 'text' can hide either in request.args or request.form
-	if 'curl' in request.headers['User-Agent'].lower() or request.method == 'POST':
-		verbose("Received request from cURL. Will return JSON...")
+	# Request made via cURL, so we serve JSON
+	verbose("Received {} request at /spacy_rest (no trailing slash)".format(request.method))
+	if request.method == 'POST' or 'curl' in request.headers['User-Agent'].lower():
+		
+		# 'text' can hide either in request.args or request.form
 		if 'text' in request.args and request.args['text'] is not '':
 			try:
-				return(text_to_response(request.args['text']))
-			except Exception:
-				return(error_page("Error while processing request for '{}'.".format(request.args['text'])),500)
+				json_ = text_to_json(request.args['text'])
+				return(json_to_response(json_))
+			except Exception as e:
+				return("Error while processing request for '{}'.\n{}".format(request.args['text'],dump=e),500)
+			
 		if 'text' in request.form and request.form['text'] is not '':
 			try:
-				return(text_to_response(request.form['text']))
-			except Exception:
-				return(error_page("Error while processing request for '{}'.".format(request.form['text'])),500)
-		
-		# some other fantasy argument supplied
-		if len(request.args) > 0:
-			return(TEXT_ERROR,400)
-		
-		return(TEXT_ERROR,400)
+				json_ = text_to_json(request.form['text'])
+				return(json_to_response(json_))
+			except Exception as e:
+				return("Error while processing request for '{}'.\n{}".format(request.form['text'],dump=e),500)
+				
+		return(NO_TEXT_ERROR,400)
 	
 	# serve HTML
 	if request.method == 'GET':
-		if 'text' in request.args and request.args['text'] is not '':
-			verbose("Received GET request for '{}'. Will return HTML...".format(request.args['text']))
+		if 'text' in request.args:
+			
+			if request.args['text'] is '':
+				return(error_html(NO_TEXT_ERROR),400)
+			
 			try:
 				json_ = text_to_json(request.args['text'])
-				verbose(json_,type(json_))
 				pretty_json = json.dumps(str(json.loads(json_)),sort_keys=True,indent=4)
-				verbose(pretty_json,type(pretty_json))
-				return(render_template('index.html',json=json_,pretty_json=pretty_json,input_text=request.args['text']))
+				return(render_template('index.html',json=json_,pretty_json=pretty_json,input_text=request.args['text']),200)
+			
 			except Exception as e:
-				return(error_page("Error processing GET request for '{}'".format(request.args['text'],),e),500)
+				return(error_html("Error processing GET request for '{}'".format(request.args['text']),
+								  dump=e,
+								  input_text=request.args['text']),500)
 		
 		# some other fantasy argument supplied
 		if len(request.args) > 0:
-			return(error_page(TEXT_ERROR),400)
+			return(error_html(NO_TEXT_ERROR),400)
 	
-	return(render_template('index.html',input_text=DEFAULT_TEST_INPUT),300)
+	return(render_template('index.html',input_text=TEST_SENTENCE),300)
 
 @app.route('/spacy_rest/' , methods = ['GET','POST'])
 def rest_d():
-	"""Make requests using curl -d, giving a 'text' to the request."""
+	"""Make requests using curl -d, handing a 'text' to the request."""
 
 	if request.headers['Content-Type'] == 'application/json':
 		if 'text' in request.get_json():
 			try:
-				return(text_to_response(request.get_json()['text']))
+				json_ = text_to_json(request.get_json()['text'])
+				return(json_to_response(json_))
 			except Exception as e:
 				return("Error processing request for '{}'.\n{}".format(request.get_json()['text'],e),500)
-		return(TEXT_ERROR,400)
+		return(NO_TEXT_ERROR_D,400)
 	
 	if request.headers['Content-Type'] == 'application/x-www-form-urlencoded':
 		if 'text' in request.form:
 			try:
-				return(text_to_response(request.form['text']))
+				json_ = text_to_json(request.form['text'])
+				return(json_to_response(json_))
 			except Exception as e:
 				return("Error processing request for '{}'.\n{}".format(request.form['text'],e),500)
-		else:
-			return(TEXT_ERROR,400)
-	else:
-		return("Unsupported media type.",415)
+		return(NO_TEXT_ERROR_D,400)
 		
-def error_page(error,errorcode=False):
-	return(render_template('index.html',error=error,input_text=DEFAULT_TEST_INPUT,errorcode=errorcode))
-	
-@app.errorhandler(404)
-def not_found(error):
-	return(render_template('index.html',error="404 Page not found",page_not_found="true"))
-
-def text_to_response(text):
-	"""Coordinates the entire pipeline. Returns a Response containing JSON."""
-	json_ = text_to_json(text)
-	response = json_to_response(json_)
-	return response
+	return("Unsupported media type.",415)
 		
-def text_to_json(text):
-	"""Coordinates the entire pipeline"""
-	
-	try: 
-		verbose(text)
-		text = text.replace('\n',' ')
-		verbose(text)
-		tokens = ask_stanford(text)
-		verbose(tokens)
-		tokens, tags = stanford_to_lists(tokens)
-		verbose(tokens,len(tokens),tags,len(tags))
-		doc = lists_to_spacy(tokens,tags,SPACY)
-		verbose(doc)
-		json_ = spacy_to_pubannotation_experimental(text,doc)
-		verbose(json_)
-		return(json_)
-	except Exception as e:
-		print(e)
-		return('400 Bad Request (possibly an error occured when parsing due to unexpected format',400)
-
 def json_to_response(json_):
 	response = make_response(json_)
 	
@@ -148,86 +121,74 @@ def json_to_response(json_):
 	response.headers['charset'] = 'utf-8'
 	return(response)
 	
-
 #################
 # ACTUAL PIPELINE
-#################v
-def stanford_pexpect(model=DEFAULT_MODEL,separator=DEFAULT_SEPARATOR,stanford=DEFAULT_STANFORD_DIRECTORY):
-	"""Uses pexpect to launch a Stanford JVM, which can be used repeatedly using ask_stanford() to tag text. """
+#################
+def text_to_json(text):
+	"""Coordinates the entire pipeline"""
 
-	# Explanations of arguments can be found here
-	# http://www-nlp.stanford.edu/nlp/javadoc/javanlp/edu/stanford/nlp/tagger/maxent/MaxentTagger.html
-	
-	child = pexpect.spawnu("java -cp '.:stanford-postagger.jar:lib/*' TaggerConsole {0}".format(model),cwd=stanford, maxread=1)
-	child.expect("STFINPT:",timeout=5)
-	return(child)
-	
-def ask_stanford_pexpect(stanford,text):
-	"""Tags text using a previously created Stanford JVM using stanford_pexpect()"""
-	
-	stanford.sendline(text)
-	stanford.expect('STFINPT:')
+	verbose("Starting pipeline on the following text:\n{}\n".format(text))
 
-	# This is necessary because pipe is not properly flushed
-	# https://pexpect.readthedocs.org/en/stable/commonissues.html
-	result = stanford.before + stanford.after
+	# Stanford Tagger does not like \n
+	text_delined = text.replace('\n',' ')
 
-	tokens = result.splitlines()[1:-1]
-	return(tokens)
-	
-# ToDo : Launch server here
-	
+	try:
+		tokens = ask_stanford(text_delined)
+		verbose("Tokenized as follows:\n{}\n".format(tokens))
+
+		tokens, tags = stanford_to_lists(tokens)
+		verbose("Split lists as follows:\n{0} tokens: {1}\n{2} tags: {3}".format(len(tokens),tokens,len(tags),tags))
+
+		doc = lists_to_spacy(tokens,tags,SPACY)
+		verbose("Loaded lists into spaCy\n")
+
+		json_ = spacy_to_json(text,doc)
+		verbose("Producing JSON:\n{}\n".format(json_))
+
+		return(json_)
+	except Exception as e:
+		raise(e)
+
 def stanford_socket(host=STANFORD_HOST,port=STANFORD_PORT):
+	"""Creates a socket to Stanford server"""
 	s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 	s.connect((host,port))
-	return s
+	return(s)
 	
 def ask_stanford(text,expected=1024):
-	"""Will send message to socket where Stanford Server is listening and read reply"""
+	"""Will send message to socket where Stanford server is listening and read reply"""
 	
 	s = stanford_socket()
 	
+	# Send question (needs to be in bytes)
 	if not isinstance(text, bytes):
 		try:
 			text = text.encode()
 		except Exception as e:
-			print(e)
+			raise(e)
 			return
-			
 			
 	s.sendall(text)
 	s.shutdown(socket.SHUT_WR)
 	
-	# TODO: Timeout
-	
+	# Read reply
 	reply = ""
+	now = time.time()
 	while True:
 		data = s.recv(expected)
 		if data == b'':
 			break
 		reply += data.decode()
+		
+		if ( time.time() - now ) > STANFORD_TIMEOUT:
+			raise(TimeoutError("Stanford failed to reply within {} seconds.".format(STANFORD_TIMEOUT)))
+			break
 	
 	s.close()
 	
-	# TODO: replayce this split with a more elaborate method
-	return reply.strip().split()
+	return(reply.strip().split())
 
-def stanford(input_text,model=DEFAULT_MODEL,stanford=DEFAULT_STANFORD_DIRECTORY):
-	"""Uses model to tokenize and tag input text. Assumes that Tagger.java is already compiled. This method creates and closes a new JVM for every call."""
-
-	subprocess.call(['pwd'])
-	output = subprocess.check_output([	'java', 
-						'-cp',
-						'.:stanford-postagger.jar:lib/*',
-						'Tagger',
-						model,
-						input_text
-						], cwd=stanford
-						)
-
-	return([s.decode("utf-8").strip() for s in output.splitlines()])
-
-def stanford_to_lists(tokens,separator=DEFAULT_SEPARATOR):
+def stanford_to_lists(tokens,separator=STANFORD_SEPARATOR):
 	"""Extracts tags and tokens from Stanfords representation. Different models use different separators, usually '/' or '_'"""
 	token_list = list()
 	pos_list = list()
@@ -312,7 +273,7 @@ def spacy_to_pubannotation(doc):
 	my_json = json.loads(json.dumps(pre_json))
 	return(json.dumps(my_json,sort_keys=True))
 	
-def spacy_to_pubannotation_experimental(text,doc):
+def spacy_to_json(text,doc):
 	"""Given an original text and spacy object, produce JSON with original text positions"""
 	
 	# we do the same thing as above
@@ -350,35 +311,39 @@ def spacy_to_pubannotation_experimental(text,doc):
 	
 	
 
-#########################
-# SCRIPT HELPER FUNCTIONS
-#########################
+##################
+# HELPER FUNCTIONS
+##################
 def verbose(*args):
 	if arguments.verbose:
 		for arg in args:
 			print(arg)
-		return time.time()
-	return 0
+	
+def error_html(error,dump=False,input_text=False):
+	if not input_text:
+		input_text = TEST_SENTENCE
+
+	return(render_template('index.html',error=error,input_text=input_text,errorcode=dump))
+
+@app.errorhandler(404)
+def not_found(error):
+	return(render_template('index.html',error="Page not found",page_not_found="true"),404)
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-m', '--model' , action="store" ,
-						dest="model" , default=DEFAULT_MODEL ,
+						dest="model" , default=STANFORD_MODEL ,
 						help="Complete path to Stanford model")
 	parser.add_argument('-s', '--separator' , action="store" ,
-						dest="separator" , default=DEFAULT_SEPARATOR ,
+						dest="separator" , default=STANFORD_SEPARATOR ,
 						help="Character used by Stanford tagger to display separation between tag and token, normally example_NN or example/NN")
-	parser.add_argument('--stanford' , action="store" ,
-						dest="stanford" , default=DEFAULT_STANFORD_DIRECTORY ,
-						help="Complete path to directory containing stanford-postagger.jar, lib folder and TaggerConsole.class")
 	parser.add_argument('-v','--verbose' , action="store_true" ,
 						dest="verbose" , default=False ,
-						help="Activates loading and debug messages")					
+						help="Activates loading and debug messages")
 	arguments = parser.parse_args(sys.argv[1:])
 	
-	DEFAULT_MODEL = arguments.model
-	DEFAULT_SEPARATOR = arguments.separator
-	DEFAULT_STANFORD_DIRECTORY = arguments.stanford
+	STANFORD_MODEL = arguments.model
+	STANFORD_SEPARATOR = arguments.separator
 	
 	start = verbose("Stanford + spaCy accessor.\n")
 		
