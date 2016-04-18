@@ -126,13 +126,14 @@ def text_to_json(text):
 		tokens = ask_stanford(text)
 		verbose(tokens)
 		tokens, tags = stanford_to_lists(tokens)
-		verbose(tokens,tags)
+		verbose(tokens,len(tokens),tags,len(tags))
 		doc = lists_to_spacy(tokens,tags,SPACY)
 		verbose(doc)
-		json_ = spacy_to_pubannotation(doc)
+		json_ = spacy_to_pubannotation_experimental(text,doc)
 		verbose(json_)
 		return(json_)
-	except Exception:
+	except Exception as e:
+		print(e)
 		return('400 Bad Request (possibly an error occured when parsing due to unexpected format',400)
 
 def json_to_response(json_):
@@ -236,22 +237,43 @@ def stanford_to_lists(tokens,separator=DEFAULT_SEPARATOR):
 		# SPECIAL CASE
 		# -LBR- and -RRB- from Stanford tagger must be 
 		# replaced by actual parentheses for spaCy parser
-		if "".join(token.split(separator)[:-1]) == '-LRB-':
+		testee = "".join(token.split(separator)[:-1])
+		tag = token.split(separator)[-1]
+		if testee == '-LRB-':
 			token_list.append("(")
+			pos_list.append(tag)
 
-		elif "".join(token.split(separator)[:-1]) == '-RRB-':
+		elif testee == '-RRB-':
 			token_list.append(")")
+			pos_list.append(tag)
 			
 		# as well as -LSB- and -RSB-
-		elif "".join(token.split(separator)[:-1]) == '-LSB-':
-			token_list.append("[") 
+		elif testee == '-LSB-':
+			token_list.append("[")
+			pos_list.append(tag)
 		
-		elif "".join(token.split(separator)[:-1]) == '-RSB-':
+		elif testee == '-RSB-':
 			token_list.append("]")
+			pos_list.append(tag)
+			
+		# SPECIAL CASE
+		# Stanfords `` and '' (opening + closing quotes) must be
+		# replaced. Maybe we also need to replace the tag.
+		elif testee == '``' or testee == '`':
+			token_list.append("\"")
+			pos_list.append(tag)
+			
+		elif testee == '\'\'':
+			token_list.append("\"")
+			pos_list.append(tag)
+			
+		elif testee == '\'' and tag == '\'\'':
+			token_list.append("\'")
+			pos_list.append(tag)
 
 		else:
 			token_list.append(separator.join(token.split(separator)[:-1]))
-		pos_list.append(token.split(separator)[-1])
+			pos_list.append(token.split(separator)[-1])
 
 	return token_list, pos_list
 		
@@ -289,6 +311,44 @@ def spacy_to_pubannotation(doc):
 
 	my_json = json.loads(json.dumps(pre_json))
 	return(json.dumps(my_json,sort_keys=True))
+	
+def spacy_to_pubannotation_experimental(text,doc):
+	"""Given an original text and spacy object, produce JSON with original text positions"""
+	
+	# we do the same thing as above
+	# but we include a search from the original text
+	
+	current_position = 0
+	
+	
+	pre_json = { "text" : text }
+	pre_json["denotations"] = list()
+	pre_json["relations"] = list()
+	
+	for token in doc:
+		token_dict = dict()
+		token_dict["id"] = "T{}".format(token.i)
+		
+		print(current_position,text[current_position:])
+		position = text[current_position:].find(token.text)
+		print(position,token.text)
+		token_dict["span"] = { "begin" : current_position + position , "end" : current_position + position + len(token.text)}
+		current_position += position + len(token.text)
+
+		token_dict["obj"] = token.tag_
+		pre_json["denotations"].append(token_dict)
+	
+		relation_dict = dict()
+		relation_dict["id"] = "R{}".format(token.i)
+		relation_dict["subj"] = "T{}".format(token.i)
+		relation_dict["obj"] = "T{}".format(token.head.i)
+		relation_dict["pred"] = token.dep_
+		pre_json["relations"].append(relation_dict)
+	
+	my_json = json.loads(json.dumps(pre_json))
+	return(json.dumps(my_json,sort_keys=True))
+	
+	
 
 #########################
 # SCRIPT HELPER FUNCTIONS
