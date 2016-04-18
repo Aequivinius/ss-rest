@@ -120,7 +120,10 @@ def text_to_json(text):
 	"""Coordinates the entire pipeline"""
 	
 	try: 
-		tokens = ask_stanford(STANFORD,text)
+		verbose(text)
+		text = text.replace('\n',' ')
+		verbose(text)
+		tokens = ask_stanford(text)
 		verbose(tokens)
 		tokens, tags = stanford_to_lists(tokens)
 		verbose(tokens,tags)
@@ -178,7 +181,7 @@ def stanford_socket(host=STANFORD_HOST,port=STANFORD_PORT):
 	s.connect((host,port))
 	return s
 	
-def ask_stanford(stanford_socket,text,expected=1024):
+def ask_stanford(text,expected=1024):
 	"""Will send message to socket where Stanford Server is listening and read reply"""
 	
 	s = stanford_socket()
