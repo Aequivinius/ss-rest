@@ -31,9 +31,13 @@ app = Flask(__name__)
 # HELPER FUNCTIONS
 ##################
 def verbose(*args):
-	if arguments.verbose:
-		for arg in args:
-			print(arg)
+	try:
+		if arguments.verbose:
+			for arg in args:
+				print(arg)
+	except NameError:
+		# arguments.verbose is not defined
+		pass
 
 # https://www.andreas-jung.com/contents/a-python-decorator-for-measuring-the-execution-time-of-methods
 def timeit(f):
@@ -294,22 +298,22 @@ def stanford_to_lists(tokens,separator=STANFORD_SEPARATOR):
 			token_list.append("]")
 			
 		# Stanfords `` and '' (opening + closing quotes)
-		elif token == '``' or token == '`':
+		elif token == '``':
 			token_list.append("\"")
+			
+		elif token == '`':
+			token_list.append("\'")
 			
 		elif token == '\'\'':
 			token_list.append("\"")
-			
-		elif token == '\'' and tag == '\'\'':
-			token_list.append("\'")
 
 		else:
 			token_list.append(token)
 		
 		tag_list.append(tag)
 		
-		if len(token_list) is not len(tag_list):
-			raise(Exception('Number of tokens and tags is not the same.'))
+	if not len(token_list) == len(tag_list):
+		raise(Exception('Number of tokens and tags is not the same.'))
 
 	return token_list, tag_list
 
