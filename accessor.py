@@ -1,10 +1,12 @@
 from flask import Flask, request , make_response , render_template
 from spacy.en import English
 import socket
+import subprocess
 
 import argparse , sys
 import json
 import time
+import datetime
 
 ################
 # DEFAULT VALUES
@@ -15,14 +17,55 @@ STANFORD_HOST = 'localhost'
 STANFORD_PORT = 2020
 STANFORD_TIMEOUT = 5 # in seconds
 
-TEST_SENTENCE = """Much I marveled this ungainly fowl to hear discourse so plainly,
-Though its answer little meaning— little relevancy bore"""
+ERROR_FILE = 'error.log'
+
+TEST_SENTENCE = """Much I marveled this ungainly fowl to hear discourse so plainly; though its answer little meaning - little relevancy bore."""
 NO_TEXT_ERROR = """No 'text' to process supplied. Use spacy_rest?text=This+is+an+example."""
-NO_TEXT_ERROR_D = """No 'text' to process supplied. Use the following: curl -d text="This is an example""""
+NO_TEXT_ERROR_D = """No 'text' to process supplied. Use the following: curl -d text="This is an example"""
 
 # Needs to be launched here, so Flask can deal
 # With the decorators
 app = Flask(__name__)
+
+##################
+# HELPER FUNCTIONS
+##################
+def verbose(*args):
+	if arguments.verbose:
+		for arg in args:
+			print(arg)
+
+# https://www.andreas-jung.com/contents/a-python-decorator-for-measuring-the-execution-time-of-methods
+def timeit(f):
+	def timed(*args, **kw):
+
+		ts = time.time()
+		result = f(*args, **kw)
+		te = time.time()
+
+		verbose("'{}()' executed in {:2.3f} seconds.".format(f.__name__,(te-ts)))
+		return result
+
+	return timed
+
+def error_html(error,dump=False,input_text=False):
+	if not input_text:
+		input_text = TEST_SENTENCE
+	return(render_template('index.html',error=error,input_text=input_text,dump=dump))
+
+def error_log(error,error_file=ERROR_FILE):
+	with open(error_file,'a') as f:
+		f.write(str(datetime.datetime.utcnow()) + "\n")
+		try:
+			f.write(str(error))
+		except Exception:
+			f.write("Error could not be written.")
+		
+		f.write("\n\n")
+
+@app.errorhandler(404)
+def not_found(error):
+	return(render_template('index.html',error="Page not found",page_not_found="true"),404)
 
 ###################
 # GENERAL STRUCTURE
@@ -42,7 +85,7 @@ def rest():
 	   and to serve the HTML"""
 	
 	# Request made via cURL, so we serve JSON
-	verbose("Received {} request at /spacy_rest (no trailing slash)".format(request.method))
+	verbose("Received {} request at /spacy_rest (no trailing slash).".format(request.method))
 	if request.method == 'POST' or 'curl' in request.headers['User-Agent'].lower():
 		
 		# 'text' can hide either in request.args or request.form
@@ -51,14 +94,16 @@ def rest():
 				json_ = text_to_json(request.args['text'])
 				return(json_to_response(json_))
 			except Exception as e:
-				return("Error while processing request for '{}'.\n{}".format(request.args['text'],dump=e),500)
+				error_log(e)
+				return("Error while processing request for '{}'. Check {} for more information.\n".format(request.args['text'],ERROR_FILE),500)
 			
 		if 'text' in request.form and request.form['text'] is not '':
 			try:
 				json_ = text_to_json(request.form['text'])
 				return(json_to_response(json_))
 			except Exception as e:
-				return("Error while processing request for '{}'.\n{}".format(request.form['text'],dump=e),500)
+				error_log(e)
+				return("Error while processing request for '{}'. Check {} for more information.\n".format(request.form['text'],ERROR_FILE),500)
 				
 		return(NO_TEXT_ERROR,400)
 	
@@ -75,9 +120,11 @@ def rest():
 				return(render_template('index.html',json=json_,pretty_json=pretty_json,input_text=request.args['text']),200)
 			
 			except Exception as e:
+				error_log(e)
 				return(error_html("Error processing GET request for '{}'".format(request.args['text']),
 								  dump=e,
 								  input_text=request.args['text']),500)
+				
 		
 		# some other fantasy argument supplied
 		if len(request.args) > 0:
@@ -95,7 +142,8 @@ def rest_d():
 				json_ = text_to_json(request.get_json()['text'])
 				return(json_to_response(json_))
 			except Exception as e:
-				return("Error processing request for '{}'.\n{}".format(request.get_json()['text'],e),500)
+				error_log(e)
+				return("Error while processing request for '{}'. Check {} for more information.\n".format(request.get_json()['text'],ERROR_FILE),500)
 		return(NO_TEXT_ERROR_D,400)
 	
 	if request.headers['Content-Type'] == 'application/x-www-form-urlencoded':
@@ -104,7 +152,8 @@ def rest_d():
 				json_ = text_to_json(request.form['text'])
 				return(json_to_response(json_))
 			except Exception as e:
-				return("Error processing request for '{}'.\n{}".format(request.form['text'],e),500)
+				error_log(e)
+				return("Error while processing request for '{}'. Check {} for more information.\n".format(request.form['text'],ERROR_FILE),500)
 		return(NO_TEXT_ERROR_D,400)
 		
 	return("Unsupported media type.",415)
@@ -124,50 +173,61 @@ def json_to_response(json_):
 #################
 # ACTUAL PIPELINE
 #################
+
+@timeit
 def text_to_json(text):
 	"""Coordinates the entire pipeline"""
 
-	verbose("Starting pipeline on the following text:\n{}\n".format(text))
+	verbose("Starting pipeline on the following text: {}".format(text))
 
 	# Stanford Tagger does not like \n
 	text_delined = text.replace('\n',' ')
 
 	try:
+		verbose("Asking Stanford...")
 		tokens = ask_stanford(text_delined)
 		verbose("Tokenized as follows:\n{}\n".format(tokens))
 
+		verbose("Transforming lists...")
 		tokens, tags = stanford_to_lists(tokens)
 		verbose("Split lists as follows:\n{0} tokens: {1}\n{2} tags: {3}".format(len(tokens),tokens,len(tags),tags))
 
+		verbose("Parsing with spaCy...")
 		doc = lists_to_spacy(tokens,tags,SPACY)
 		verbose("Loaded lists into spaCy\n")
 
-		json_ = spacy_to_json(text,doc)
+		verbose("Convert spaCy to JSON...")
+		json_ = spacy_to_json(doc,text)
 		verbose("Producing JSON:\n{}\n".format(json_))
 
 		return(json_)
 	except Exception as e:
 		raise(e)
 
+@timeit
 def stanford_socket(host=STANFORD_HOST,port=STANFORD_PORT):
 	"""Creates a socket to Stanford server"""
 	s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 	s.connect((host,port))
 	return(s)
-	
-def ask_stanford(text,expected=1024):
-	"""Will send message to socket where Stanford server is listening and read reply"""
+
+@timeit
+def ask_stanford(text,expected=1024,timeout=STANFORD_TIMEOUT):
+	"""Sends message to socket where Stanford server is listening and reads reply"""
 	
 	s = stanford_socket()
 	
 	# Send question (needs to be in bytes)
 	if not isinstance(text, bytes):
 		try:
+			verbose("Text needs to be converted to bytes.")
 			text = text.encode()
 		except Exception as e:
 			raise(e)
+			s.close()
 			return
-			
+	
+	verbose("Sending question to Stanford...")		
 	s.sendall(text)
 	s.shutdown(socket.SHUT_WR)
 	
@@ -180,66 +240,86 @@ def ask_stanford(text,expected=1024):
 			break
 		reply += data.decode()
 		
-		if ( time.time() - now ) > STANFORD_TIMEOUT:
-			raise(TimeoutError("Stanford failed to reply within {} seconds.".format(STANFORD_TIMEOUT)))
+		if ( time.time() - now ) > timeout:
+			s.close()
+			raise(Exception.TimeoutError("Stanford failed to reply within {} seconds.".format(timeout)))
 			break
 	
 	s.close()
-	
-	return(reply.strip().split())
+	return(split_stanford(reply))
 
+@timeit	
+def split_stanford(text,separator=STANFORD_SEPARATOR):
+	"""Splits Stanford output while allowing for tokens to contain spaces"""
+
+	tokens = list()
+	previous_element = ''
+	for element in text.strip().split():
+		if separator in element:
+			if len(previous_element) > 0:
+				element = previous_element + element
+			tokens.append(element)
+			previous_element = ''
+
+		else:
+			previous_element = (previous_element + " " + element).strip()
+			
+	return(tokens)
+
+@timeit
 def stanford_to_lists(tokens,separator=STANFORD_SEPARATOR):
 	"""Extracts tags and tokens from Stanfords representation. Different models use different separators, usually '/' or '_'"""
 	token_list = list()
-	pos_list = list()
+	tag_list = list()
 
-	for token in tokens:
+	for element in tokens:
 
-		# SPECIAL CASE
-		# -LBR- and -RRB- from Stanford tagger must be 
-		# replaced by actual parentheses for spaCy parser
-		testee = "".join(token.split(separator)[:-1])
-		tag = token.split(separator)[-1]
-		if testee == '-LRB-':
+		# Stanford changes some tokes, we need to revert this
+		
+		# -LBR- and -RRB-
+		token = separator.join(element.split(separator)[:-1])
+		tag = element.split(separator)[-1]
+
+		if token == '-LRB-':
 			token_list.append("(")
-			pos_list.append(tag)
 
-		elif testee == '-RRB-':
+		elif token == '-RRB-':
 			token_list.append(")")
-			pos_list.append(tag)
 			
 		# as well as -LSB- and -RSB-
-		elif testee == '-LSB-':
+		elif token == '-LSB-':
 			token_list.append("[")
-			pos_list.append(tag)
 		
-		elif testee == '-RSB-':
+		elif token == '-RSB-':
 			token_list.append("]")
-			pos_list.append(tag)
 			
-		# SPECIAL CASE
-		# Stanfords `` and '' (opening + closing quotes) must be
-		# replaced. Maybe we also need to replace the tag.
-		elif testee == '``' or testee == '`':
+		# Stanfords `` and '' (opening + closing quotes)
+		elif token == '``' or token == '`':
 			token_list.append("\"")
-			pos_list.append(tag)
 			
-		elif testee == '\'\'':
+		elif token == '\'\'':
 			token_list.append("\"")
-			pos_list.append(tag)
 			
-		elif testee == '\'' and tag == '\'\'':
+		elif token == '\'' and tag == '\'\'':
 			token_list.append("\'")
-			pos_list.append(tag)
 
 		else:
-			token_list.append(separator.join(token.split(separator)[:-1]))
-			pos_list.append(token.split(separator)[-1])
-
-	return token_list, pos_list
+			token_list.append(token)
 		
+		tag_list.append(tag)
+		
+		if len(token_list) is not len(tag_list):
+			raise(Exception('Number of tokens and tags is not the same.'))
+
+	return token_list, tag_list
+
+@timeit		
 def lists_to_spacy(tokens,tags,nlp):
 	"""Creates a new spacy object from token and tag lists, and executes parsing algorithms"""
+	if len(tokens) is not len(tags):
+		raise(Exception('Number of tokens and tags is not the same.'))
+		return
+	
 	try:
 		doc = nlp.tokenizer.tokens_from_list(tokens)
 		nlp.tagger.tag_from_strings(doc,tags)
@@ -248,54 +328,29 @@ def lists_to_spacy(tokens,tags,nlp):
 	except (AssertionError, IndexError) as e:
 		print("Error while creating spacy object for the sentence '{}'.".format(" ".join(tokens)))
 		print(e)
-		return None
-		
-def spacy_to_pubannotation(doc):
-	"""Given a spaCy doc object, produce PubAnnotate JSON, that can be read by TextAE, for example"""
-	pre_json = { "text" : doc.text }
-	pre_json["denotations"] = list()
-	pre_json["relations"] = list()
+		return
 
-	for token in doc:
-		token_dict = dict()
-		token_dict["id"] = "T{}".format(token.i)
-		token_dict["span"] = { "begin" : token.idx , "end" : token.idx + len(token)}
-		token_dict["obj"] = token.tag_
-		pre_json["denotations"].append(token_dict)
-
-		relation_dict = dict()
-		relation_dict["id"] = "R{}".format(token.i)
-		relation_dict["subj"] = "T{}".format(token.i)
-		relation_dict["obj"] = "T{}".format(token.head.i)
-		relation_dict["pred"] = token.dep_
-		pre_json["relations"].append(relation_dict)
-
-	my_json = json.loads(json.dumps(pre_json))
-	return(json.dumps(my_json,sort_keys=True))
-	
-def spacy_to_json(text,doc):
-	"""Given an original text and spacy object, produce JSON with original text positions"""
-	
-	# we do the same thing as above
-	# but we include a search from the original text
-	
-	current_position = 0
-	
+@timeit	
+def spacy_to_json(doc,text=False):
+	"""Given a spaCy doc object, produce PubAnnotate JSON, that can be read by TextAE
+	   If original text is provided, original positions will be computed"""
 	
 	pre_json = { "text" : text }
 	pre_json["denotations"] = list()
 	pre_json["relations"] = list()
 	
+	current_position = 0
 	for token in doc:
 		token_dict = dict()
 		token_dict["id"] = "T{}".format(token.i)
 		
-		print(current_position,text[current_position:])
-		position = text[current_position:].find(token.text)
-		print(position,token.text)
-		token_dict["span"] = { "begin" : current_position + position , "end" : current_position + position + len(token.text)}
-		current_position += position + len(token.text)
-
+		if text:
+			position = text[current_position:].find(token.text)
+			token_dict["span"] = { "begin" : current_position + position , "end" : current_position + position + len(token.text)}
+			current_position += position + len(token.text)
+		else:
+			token_dict["span"] = { "begin" : token.idx , "end" : token.idx + len(token)}
+			
 		token_dict["obj"] = token.tag_
 		pre_json["denotations"].append(token_dict)
 	
@@ -308,27 +363,10 @@ def spacy_to_json(text,doc):
 	
 	my_json = json.loads(json.dumps(pre_json))
 	return(json.dumps(my_json,sort_keys=True))
-	
-	
 
-##################
-# HELPER FUNCTIONS
-##################
-def verbose(*args):
-	if arguments.verbose:
-		for arg in args:
-			print(arg)
-	
-def error_html(error,dump=False,input_text=False):
-	if not input_text:
-		input_text = TEST_SENTENCE
-
-	return(render_template('index.html',error=error,input_text=input_text,errorcode=dump))
-
-@app.errorhandler(404)
-def not_found(error):
-	return(render_template('index.html',error="Page not found",page_not_found="true"),404)
-
+################
+# RUN THE SCRIPT
+################
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-m', '--model' , action="store" ,
@@ -345,22 +383,21 @@ if __name__ == '__main__':
 	STANFORD_MODEL = arguments.model
 	STANFORD_SEPARATOR = arguments.separator
 	
-	start = verbose("Stanford + spaCy accessor.\n")
+	start = verbose("Stanford + spaCy accessor.")
 		
 	# in python, if-statements do not introduce a new scope
 	# so these variables are globally available
-	# TODO: launch server
-	# start = verbose("Launching Stanford Server...")
-	# STANFORD = stanford_socket()
-	# verbose("Stanford Server launched after {:.3f} seconds.\n".format(time.time()-start))
+	verbose("Loading spaCy (this can easily take some 20 seconds)...")
+	s = time.time()
 	
-	start = verbose("Loading spaCy (this can easily take some 20 seconds)...")
+	# for faster testing
 	SPACY = English()
-	verbose("Loaded spaCy in {:.3f} seconds.\n".format(time.time()-start))
+	verbose("Loaded spaCy in {:2.3f} seconds.".format(time.time()-s))
+	verbose("Stanford + spaCy accessor loaded completely.\n")
 	
 	verbose("Launching Flask server now...")
-	# Change this debug=False as soon as deployed.
+	# Change this debug=False when deployed.
 	# Otherwise any python code can be run on server
-	app.run(debug=arguments.verbose)
+	app.run(debug=True)
 	
-	verbose("Stanford + spaCy accessor loaded completely.\n")
+	

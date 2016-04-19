@@ -106,6 +106,10 @@ font-family:geosanslightregular, Arial, sans-serif;
 text-decoration:none;
 }
 
+h1 a:visited {
+text-decoration:none;
+}
+
 h1,h2 {
 font-family:geosanslightregular, Arial, sans-serif;
 margin:0;
