@@ -58,6 +58,7 @@ def error_html(error,dump=False,input_text=False):
 	return(render_template('index.html',error=error,input_text=input_text,dump=dump))
 
 def error_log(error,error_file=ERROR_FILE):
+	verbose(error)
 	with open(error_file,'a') as f:
 		f.write(str(datetime.datetime.utcnow()) + "\n")
 		try:
@@ -250,6 +251,7 @@ def ask_stanford(text,expected=1024,timeout=STANFORD_TIMEOUT):
 			break
 	
 	s.close()
+	verbose(reply)
 	return(split_stanford(reply))
 
 @timeit	
@@ -320,7 +322,7 @@ def stanford_to_lists(tokens,separator=STANFORD_SEPARATOR):
 @timeit		
 def lists_to_spacy(tokens,tags,nlp):
 	"""Creates a new spacy object from token and tag lists, and executes parsing algorithms"""
-	if len(tokens) is not len(tags):
+	if not len(tokens) == len(tags):
 		raise(Exception('Number of tokens and tags is not the same.'))
 		return
 	
@@ -350,6 +352,13 @@ def spacy_to_json(doc,text=False):
 		
 		if text:
 			position = text[current_position:].find(token.text)
+			
+			# token not found
+			if position == -1:
+				verbose("Token {} could not be found when realigning spaCy with original text.".format(token.text))
+				verbose("The following text except was searched: {} (starting from position {})".format(text[current_position:],current_position))
+				continue
+				
 			token_dict["span"] = { "begin" : current_position + position , "end" : current_position + position + len(token.text)}
 			current_position += position + len(token.text)
 		else:
@@ -397,7 +406,7 @@ if __name__ == '__main__':
 	# for faster testing
 	SPACY = English()
 	verbose("Loaded spaCy in {:2.3f} seconds.".format(time.time()-s))
-	verbose("Stanford + spaCy accessor loaded completely.\n")
+	verbose("Stanford + spaCy accessor loaded completely.")
 	
 	verbose("Launching Flask server now...")
 	# Change this debug=False when deployed.

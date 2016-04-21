@@ -1,0 +1,3 @@
+java -mx1000m -cp stanford-postagger.jar:lib/* edu.stanford.nlp.tagger.maxent.MaxentTaggerServer -model models/wsj-0-18-left3words-nodistsim.tagger -port 2020 &
+
+java -mx1000m -cp stanford-postagger.jar:lib/* edu.stanford.nlp.tagger.maxent.MaxentTaggerServer -model models/wsj-0-18-left3words-nodistsim.tagger -port 2020 -tokenizerOptions "strictTreebank3=true"
