@@ -19,7 +19,7 @@ STANFORD_TIMEOUT = 5 # in seconds
 
 ERROR_FILE = 'error.log'
 
-TEST_SENTENCE = """Much I marveled this ungainly fowl to hear discourse so plainly; though its answer little meaning - little relevancy bore."""
+TEST_SENTENCE = """Much I marveled this ungainly fowl to hear discourse so plainly."""
 NO_TEXT_ERROR = """No 'text' to process supplied. Use spacy_rest?text=This+is+an+example."""
 NO_TEXT_ERROR_D = """No 'text' to process supplied. Use the following: curl -d text="This is an example"""
 

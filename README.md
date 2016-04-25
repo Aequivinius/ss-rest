@@ -31,7 +31,7 @@ The accessor.py uses [Flask](http://flask.pocoo.org/) to launch a web service li
 For every request, a new client socket for the Stanford server socket is created, and Stanford's reply is read. The tokenized and tagged text is then passed to the spaCy object. The parses provided by spaCy are then realigned with the original text to facilitate using the results in [PubAnnotation](http://pubannotation.org/), converted into JSON and returned to the client.
 
 ## Performance
-Informal evaluation shows that the time for each request grows linearly in size, taking roughly 0.1s per 1000 characters. A more formal evaluation of the parsing quality can be found [here](http://cs.aequivinius.ch/downloads/dependencyparsing.pdf)
+Informal evaluation shows that the time for each request grows linearly in size, taking roughly 0.1s per 1000 characters. A more formal evaluation of the parsing quality can be found [here](http://cs.aequivinius.ch/downloads/dependencyparsing.pdf).
 
 ## Launching server
 From the *stanford* directory, the server can be launched as follows:

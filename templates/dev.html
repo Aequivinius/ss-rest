@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Stanford + spaCy accessor</title>
+
+<link rel="stylesheet" href="static/style.css" />
+<link rel="stylesheet" href="../static/style.css" />
+
+<script>
+// A simple function to copy a string to clipboard. See https://github.com/lgarron/clipboard.js for a full solution.
+var copyToClipboard = (function() {
+  var _dataString = null;
+  document.addEventListener("copy", function(e){
+	if (_dataString !== null) {
+	  try {
+		e.clipboardData.setData("text/plain", _dataString);
+		e.preventDefault();
+	  } finally {
+		_dataString = null;
+	  }
+	}
+  });
+  return function(data) {
+	_dataString = data;
+	document.execCommand("copy");
+  };
+})();
+</script>
+
+</head>
+
+<body>
+	<div class="blur-container">
+		<div class="pre-blur-box"></div>
+		<div id="header" class="blur-box">
+			<div class="title-box"
+			<div id="title">
+				<h1><a href="spacy_rest">Stanford + spaCy REST accessor</a><h1>
+			</div>
+			
+			<a href="https://github.com/Aequivinius/dbcls">see on <img src="../static/git-colored.png" width="25px"/></a>
+			</div>
+		</div>
+	</div>
+	{%  if error %}
+	<div id="error" class="blur-container">
+		<div class="pre-blur-box"></div>
+		<div class="blur-box error">
+			{{ error }}
+			
+			{% if dump %}
+			<pre><code>{{dump}}</code></pre>
+			{% endif %}
+		</div>
+	</div>
+	{% endif %}
+	
+	{% if not page_not_found %}
+	<div id="main" class="blur-container">
+	<div class="pre-blur-box"></div>
+	<div class="blur-box">
+		<h2>Demo</h2>
+		<section>
+			<form id="form-box">
+				<input type="text" id="text-field" class="white-box" name="text" value="{{input_text}}" placeholder="Input text">
+				<input id="text-value" class="white-box btn" type="submit" value="submit">
+			</form>
+		</section>
+		<section>
+			<h3 id="textae">Parsing result in <a href="http://textae.pubannotation.org">TextAE</a> visualization</h3>
+			<div class="textae-editor white-box">
+				{{ json }}
+			</div>
+		</section>
+		<section>
+			<div class="title-bar">
+				<h3>... in JSON</h3>
+				<a id="memclick" onclick="copyToClipboard(&quot;{{ pretty_json }}&quot;)">copy to memory</a>
+			</div>
+			<textarea id="json-area" class="white-box json-box code">{{ pretty_json }}</textarea>
+		</section>
+	</div>
+	</div>
+	{% endif %}
+	
+	<div id="explain" class="blur-container">
+	<div class="pre-blur-box"></div>
+	<div class="blur-box">
+		<h3>In a nutshell</h3>
+		<p>This is the web interface for a pipeline that delivers fast, accurate dependency parses using <a href="http://nlp.stanford.edu/software/tagger.shtml">Stanford POS tagger</a> and <a href="https://spacy.io/">spaCy</a> dependency parser. The result is returned in <a href="http://www.pubannotation.org/docs/annotation-format/">PubAnnotation JSON</a>, which is visualized using <a href="http://textae.pubannotation.org">TextAE</a>.</p>
+		
+		
+
+		
+		<h3>Usage</h3>
+		<p>Either use via the web interface above, or using <a href="https://curl.haxx.se/">cURL</a> as shown below:</p>
+			<code>
+				curl -H "content-type:application/json" -d '{"text":"This is a sample sentence."}' http://spacy.dbcls.jp/spacy_rest/spacy_rest/</code><br /><br />
+				
+				<code>curl -d text="Induction of chromosome banding by trypsin/EDTA for gene mapping by in situ hybridization." http://spacy.dbcls.jp/spacy_rest/spacy_rest/</code>
+			
+		<p>Any other service making RESTful requests should be possible to use. In particular, this web service was developed in order to be used in conjunction with <a href="http://pubannotation.org/">PubAnnotation</a>, which allows users to obtain annotations for collections of biomedical text automatically, and align them with the original publication.</p>
+		
+		<h3>Parsing</h3>
+		<p>A combination of the famous <a href="http://nlp.stanford.edu/software/tagger.shtml">Stanford POS tagger</a> and <a href="https://spacy.io/">spaCy</a> for parsing is used.</p>
+
+<p>spaCy is a python library for NLP. It's main strength is it's speed, owing to the underlying implementation in cython. While it does offer tokenization and POS tagging, we found that the tagger does not perform well, especially in the biomedical domain.</p>
+
+<p>We thus employ Stanford tagger in conjunction with spaCy's parser to provide high accuracy and speed. For more information about this approach, see the <a href="http://cs.aequivinius.ch/downloads/dependencyparsing.pdf">dissertation</a> that informed this project.</p>
+
+	<h3>Implementation</h3>
+	<p>The Stanford POS tagger is written in Java, and can be run as a server using <a href="https://docs.oracle.com/javase/7/docs/api/java/net/ServerSocket.html">java.net.ServerSocket</a>. Using sockets proved to be an easy way to communicate between python and Java reliably.<p>
+
+<p>The main script uses <a href="http://flask.pocoo.org/">Flask</a> to launch a web service listening to <code>rest_spacy</code> and <code>rest_spacy/</code> for incoming requests. Since loading spaCy models takes a considerable amount of time, one object containing these models is maintained that is then used for all requests.</p>
+
+<p>For every request, a new client socket for the Stanford server socket is created, and Stanford's reply is read. The tokenized and tagged text is then passed to the spaCy object. The parses provided by spaCy are then realigned with the original text to facilitate using the results in PubAnnotation, converted into JSON and returned to the client.</p>
+	</div>	
+	</div>	
+	</div>
+	
+	<div id="explain" class="blur-container">
+	<div class="pre-blur-box"></div>
+	<div class="blur-box">
+		
+		<p>This web service was developed as a joint project of the <a href="http://www.cl.uzh.ch/de.html">Institute of Computational Linguistics</a> at the University of Zurich, and the <a href="http://dbcls.rois.ac.jp/en/">DBCLS</a> in Japan. It is funded by a grant by <a href="https://www.jsps.go.jp/english/">JSPS</a>.</p>
+		
+		<div class="img-box">
+			
+		<a id="dbcls-link" href="http://dbcls.rois.ac.jp/en/"  ><img class="logo" src="../static/dbcls-colored.png" onmouseover="this.src='../static/dbcls-hover.png';" onmouseout="this.src='../static/dbcls-colored.png';"/></a>
+		<a id="uzh-link" href="http://www.cl.uzh.ch/de.html"><img class="logo" src="../static/uzh-colored.png" onmouseover="this.src='../static/uzh-hover.png';" onmouseout="this.src='../static/uzh-colored.png';"/></a>
+		<a id="jsps-link" href="https://www.jsps.go.jp/english/"><img class="logo" src="../static/jsps-colored.png" onmouseover="this.src='../static/jsps-hover.png';" onmouseout="this.src='../static/jsps-colored.png';"/></a>
+		</div>
+	</div>	
+	</div>	
+	</div>
+	</div>
+</body>
+</html>
