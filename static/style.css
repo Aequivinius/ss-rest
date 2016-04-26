@@ -269,6 +269,28 @@ p a {
 
 }
 
+#git-link {
+	color: #5A4E40;
+	font-size: 1em;
+	text-decoration: none;
+	vertical-align: bottom;
+	position: absolute;
+	bottom: 20px;
+	right: 20px;
+}
+
+#git-link:hover {
+	color: #99A853;
+	font-size: 1em;
+	text-decoration: none;
+	vertical-align: bottom;
+	position: absolute;
+	bottom: 20px;
+	right: 20px;
+}
+
+
+
 p a:hover {
 	background-image:url(link_hover.png);
 	background-position:left center;
