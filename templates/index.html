@@ -3,9 +3,23 @@
 <head>
 <title>Stanford + spaCy accessor</title>
 
-<link rel="stylesheet" href="static/style.css" />
 <link rel="stylesheet" href="../static/style.css" />
 <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/themes/smoothness/jquery-ui.css" />
+<link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css" />
+<link rel="stylesheet" href="http://textae.pubannotation.org/lib/css/textae.min.css" />
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/jquery-ui.min.js"></script>
+<script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.6.0/underscore-min.js"></script>
+<script src="http://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
+<script src="http://textae.pubannotation.org/vender/jquery.jsPlumb-1.5.2-min.js"></script>
+<script src="http://textae.pubannotation.org/lib/textae.min.js"></script>
+
+
+<link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/themes/smoothness/jquery-ui.css" />
+
+<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.18.1/build/cssreset-context/cssreset-context-min.css">
+
+
 
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
 <script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/jquery-ui.min.js"></script>
@@ -39,6 +53,7 @@ var copyToClipboard = (function() {
 </head>
 
 <body>
+	<div class="container-box">
 	<div class="blur-container">
 		<div class="pre-blur-box"></div>
 		<div id="header" class="blur-box">
@@ -77,7 +92,7 @@ var copyToClipboard = (function() {
 		</section>
 		<section>
 			<h3 id="textae">Parsing result in <a href="http://textae.pubannotation.org">TextAE</a> visualization</h3>
-						<div class="textae-editor white-box">
+						<div class=".yui3-cssreset textae-editor">
 							{{ json }}
 						</div>
 					</section>
@@ -143,5 +158,6 @@ var copyToClipboard = (function() {
 				</div>	
 				</div>
 				</div>
+	</div>
 </body>
 </html>
