@@ -15,26 +15,18 @@
 <script src="http://textae.pubannotation.org/vender/jquery.jsPlumb-1.5.2-min.js"></script>
 <script src="http://textae.pubannotation.org/lib/textae.min.js"></script>
 
-<!-- <script>
-// A simple function to copy a string to clipboard. See https://github.com/lgarron/clipboard.js for a full solution.
-var copyToClipboard = (function() {
-  var _dataString = null;
-  document.addEventListener("copy", function(e){
-	if (_dataString !== null) {
-	  try {
-		e.clipboardData.setData("text/plain", _dataString);
-		e.preventDefault();
-	  } finally {
-		_dataString = null;
-	  }
-	}
-  });
-  return function(data) {
-	_dataString = data;
-	document.execCommand("copy");
-  };
-})();
-</script> -->
+<script src="https://cdn.jsdelivr.net/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+	$( document ).ready(function() {
+		var el = document.getElementById('memclick');
+		if(el){
+			new Clipboard('#memclick');
+		} else {
+			alert("nope");
+		}
+	});	
+</script>
 
 
 </head>
@@ -86,7 +78,7 @@ var copyToClipboard = (function() {
 				<section>
 					<div class="title-bar">
 						<h3>... in JSON</h3>
-						<a id="memclick" onclick="copyToClipboard(&quot;{{ pretty_json }}&quot;)">copy to memory</a>
+							<a id="memclick" data-clipboard-target="#json-area">copy to memory</a>
 					</div>
 					<textarea id="json-area" class="white-box json-box code">{{ pretty_json }}</textarea>
 				</section>
