@@ -22,6 +22,7 @@ ERROR_FILE = 'error.log'
 TEST_SENTENCE = """Much I marveled this ungainly fowl to hear discourse so plainly."""
 NO_TEXT_ERROR = """No 'text' to process supplied. Use spacy_rest?text=This+is+an+example."""
 NO_TEXT_ERROR_D = """No 'text' to process supplied. Use the following: curl -d text="This is an example"""
+TEST_JSON = {'relations': [{'id': 'R0', 'obj': 'T2', 'subj': 'T0', 'pred': 'advmod'}, {'id': 'R1', 'obj': 'T2', 'subj': 'T1', 'pred': 'nsubj'}, {'id': 'R2', 'obj': 'T2', 'subj': 'T2', 'pred': 'ROOT'}, {'id': 'R3', 'obj': 'T5', 'subj': 'T3', 'pred': 'det'}, {'id': 'R4', 'obj': 'T5', 'subj': 'T4', 'pred': 'amod'}, {'id': 'R5', 'obj': 'T2', 'subj': 'T5', 'pred': 'dobj'}, {'id': 'R6', 'obj': 'T7', 'subj': 'T6', 'pred': 'aux'}, {'id': 'R7', 'obj': 'T2', 'subj': 'T7', 'pred': 'advcl'}, {'id': 'R8', 'obj': 'T7', 'subj': 'T8', 'pred': 'dobj'}, {'id': 'R9', 'obj': 'T10', 'subj': 'T9', 'pred': 'advmod'}, {'id': 'R10', 'obj': 'T7', 'subj': 'T10', 'pred': 'advmod'}, {'id': 'R11', 'obj': 'T2', 'subj': 'T11', 'pred': 'punct'}], 'denotations': [{'id': 'T0', 'obj': 'JJ', 'span': {'begin': 0, 'end': 4}}, {'id': 'T1', 'obj': 'PRP', 'span': {'begin': 5, 'end': 6}}, {'id': 'T2', 'obj': 'VBD', 'span': {'begin': 7, 'end': 15}}, {'id': 'T3', 'obj': 'DT', 'span': {'begin': 16, 'end': 20}}, {'id': 'T4', 'obj': 'JJ', 'span': {'begin': 21, 'end': 29}}, {'id': 'T5', 'obj': 'NN', 'span': {'begin': 30, 'end': 34}}, {'id': 'T6', 'obj': 'TO', 'span': {'begin': 35, 'end': 37}}, {'id': 'T7', 'obj': 'VB', 'span': {'begin': 38, 'end': 42}}, {'id': 'T8', 'obj': 'NN', 'span': {'begin': 43, 'end': 52}}, {'id': 'T9', 'obj': 'IN', 'span': {'begin': 53, 'end': 55}}, {'id': 'T10', 'obj': 'RB', 'span': {'begin': 56, 'end': 63}}, {'id': 'T11', 'obj': '.', 'span': {'begin': 63, 'end': 64}}], 'text': 'Much I marveled this ungainly fowl to hear discourse so plainly.'}
 
 # Needs to be launched here, so Flask can deal
 # With the decorators
@@ -121,7 +122,7 @@ def rest():
 			
 			try:
 				json_ = text_to_json(request.args['text'])
-				pretty_json = json.dumps(str(json.loads(json_)),sort_keys=True,indent=4)
+				pretty_json = json.dumps(json.loads(str(json_)),sort_keys=True,indent=4)
 				return(render_template('index.html',json=json_,
 													pretty_json=pretty_json,
 													input_text=request.args['text']),200)
@@ -137,7 +138,10 @@ def rest():
 		if len(request.args) > 0:
 			return(error_html(NO_TEXT_ERROR),400)
 	
-	return(render_template('index.html',input_text=TEST_SENTENCE),300)
+	# serve welcome site with sample query
+	return(render_template('index.html',input_text=TEST_SENTENCE,
+										json=json.dumps(TEST_JSON),
+										pretty_json=json.dumps(TEST_JSON,indent=4)),300)
 
 @app.route('/spacy_rest/' , methods = ['GET','POST'])
 def rest_d():
@@ -376,8 +380,7 @@ def spacy_to_json(doc,text=False):
 		relation_dict["pred"] = token.dep_
 		pre_json["relations"].append(relation_dict)
 	
-	my_json = json.loads(json.dumps(pre_json))
-	return(json.dumps(my_json,sort_keys=True))
+	return(json.dumps(pre_json,sort_keys=True))
 
 ################
 # RUN THE SCRIPT
@@ -414,5 +417,4 @@ if __name__ == '__main__':
 	# Change this debug=False when deployed.
 	# Otherwise any python code can be run on server
 	app.run(debug=True)
-	
 	
