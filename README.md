@@ -34,7 +34,11 @@ For every request, a new client socket for the Stanford server socket is created
 Informal evaluation shows that the time for each request grows linearly in size, taking roughly 0.1s per 1000 characters. A more formal evaluation of the parsing quality can be found [here](http://cs.aequivinius.ch/downloads/dependencyparsing.pdf).
 
 ## Launching server
-From the *stanford* directory, the server can be launched as follows:
+The script *launch.sh* takes care of launching both the Stanford server and the accessor.py. If *tmux* is installed, it will try to launch these process in a new tmux session so that the shell can be closed without stopping the processes necessary for the server. Run the script as follows:
+
+`./launch.sh`
+
+Alternatively, you can start the processes manually. From the *stanford* directory, the server can be launched as follows:
 
 `java -mx1000m -cp stanford-postagger.jar:lib/* edu.stanford.nlp.tagger.maxent.MaxentTaggerServer -model models/wsj-0-18-left3words-nodistsim.tagger -port 2020 -tokenizerOptions "strictTreebank3=true" &`
 
