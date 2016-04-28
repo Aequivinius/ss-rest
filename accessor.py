@@ -122,7 +122,9 @@ def rest():
 			try:
 				json_ = text_to_json(request.args['text'])
 				pretty_json = json.dumps(str(json.loads(json_)),sort_keys=True,indent=4)
-				return(render_template('index.html',json=json_,pretty_json=pretty_json,input_text=request.args['text']),200)
+				return(render_template('index.html',json=json_,
+													pretty_json=pretty_json,
+													input_text=request.args['text']),200)
 			
 			except Exception as e:
 				error_log(e)

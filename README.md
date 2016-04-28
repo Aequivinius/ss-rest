@@ -36,7 +36,7 @@ Informal evaluation shows that the time for each request grows linearly in size,
 ## Launching server
 The script *launch.sh* takes care of launching both the Stanford server and the accessor.py. If *tmux* is installed, it will try to launch these process in a new tmux session so that the shell can be closed without stopping the processes necessary for the server. Run the script as follows:
 
-`./launch.sh`
+`./launch.sh` or `./launch.sh -v`
 
 Alternatively, you can start the processes manually. From the *stanford* directory, the server can be launched as follows:
 
